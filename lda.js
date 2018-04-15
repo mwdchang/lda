@@ -62,7 +62,6 @@ const sample = (m, n, { vocabSize, K, docsIndexed, Z, N_doc_topic, N_word_topic,
   N_topic_sum[tIdx]++ 
   N_doc_sum[m] ++;
   Z[m][n] = tIdx;
-  console.log('tIdx', tIdx);
 };
 
 
@@ -72,11 +71,10 @@ const sample = (m, n, { vocabSize, K, docsIndexed, Z, N_doc_topic, N_word_topic,
  * @param {number} K - number of topics to model
  * @param {number} maxIter - maximum number of iterations to run
  */
-const run = (docs, K, maxIter = 10) => {
+const run = (docs, K, maxIter = 50) => {
   const docsSize = docs.length;
   const vocab = getVocabulary(docs);
   const vocabSize = vocab.length;
-
 
   // Transform to indiced vocab
   const docsIndexed = docs.map( doc => {
@@ -87,16 +85,19 @@ const run = (docs, K, maxIter = 10) => {
 
   console.log('Documents:', docsSize);
   console.log('Vocab size:', vocabSize);
-  console.log('Indexed:', docsIndexed);
-
 
   /* Topic for doc/word */
-  const Z = createArray(docsSize);
-  const N_doc_topic = createArray(docsSize, K);
-  const N_word_topic = createArray(vocabSize, K);
+  const Z = createArray(docsSize);                 // Topic assignment per word
+  const N_doc_topic = createArray(docsSize, K);    // Counts the number of times a doc is assigned to topic
+  const N_word_topic = createArray(vocabSize, K);  // Counts the number of times a word is assigned to topic 
   const N_topic_sum = createArray(K);
   const N_doc_sum = createArray(docsSize);
-  
+
+  /* Statistics */
+  const thetasum = createArray(docsSize, K);  // Document stats
+  const phisum = createArray(K, vocabSize);   // Topic stats
+  let numStats = 0;
+
 
   for (let m=0; m < docsSize; m++) {
     const docSize = docs[m].length;
@@ -112,8 +113,6 @@ const run = (docs, K, maxIter = 10) => {
     N_doc_sum[m] = docSize;
   }
 
-  console.log('Starting...\n', Z);
-  console.log(N_word_topic, N_doc_topic, N_topic_sum, N_doc_sum);
   // Start iterations
   for (let iterIdx = 0; iterIdx < maxIter; iterIdx++) {
     for (let m=0; m < docsSize; m++) {
@@ -132,10 +131,24 @@ const run = (docs, K, maxIter = 10) => {
     }
   }
 
+
+  const theta = createArray(docsSize, K);
+  const phi = createArray(K, vocabSize);
+
+  for (let k = 0; k < K; k++) {
+    for (let w = 0; w < vocabSize; w++) {
+      phi[k][w] = (N_word_topic[w][k] + beta) / (N_topic_sum[k] + vocabSize * beta);
+    }
+  }
+
+  for (let m = 0; m < docsSize; m++) {
+    for (let k = 0; k < K; k++) {
+        theta[m][k] = (N_doc_topic[m][k] + alpha) / (N_doc_sum[m] + K * alpha);
+    }
+  }
+  
   // Done
-  console.log('Done\n', Z);
-  console.log('...');
-  console.log(N_doc_topic);
+  return [phi, theta, vocab];
 };
 
 
