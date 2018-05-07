@@ -157,5 +157,4 @@ const LDA = {
   run: run
 }
 
-
-module.exports = LDA;
+// module.exports = LDA;

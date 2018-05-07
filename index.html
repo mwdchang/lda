@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>LDA</title>
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.10/lodash.js"></script>
+<script src="stemmer.js"></script>
+<script src="quotes.js"></script>
+<script src="lda.js"></script>
+
+<link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+  <section>
+    <h3>Topic Modelling with LDA</h3>
+    <p>
+    Simple, no-frills mixed-topic modelling. The implementation primarily follows the steps
+    outlined in this <a href="http://u.cs.biu.ac.il/~89-680/darling-lda.pdf">technical report</a>.
+
+    We randomly draws 60 quotes from a pool and feed them into LDA. The output has 4 topics. Each topic's
+    top 5 word tokens are shown, and below we show the topic distribution across each quotes, the higher 
+    scored topic is more opaque while the low scored topic is more transparent.
+    </p>
+    <br>
+    <button style="font-size: 120%" onclick="runLDA()">Run LDA</button>
+    <br>
+    <br>
+
+    <table id="topics"></table>
+    <br>
+
+    <table id="quotes"></table>
+    <br>
+
+    <small><em>
+      Quotes sourced from https://www.huffingtonpost.com/lolly-daskal-/100-motivational-quotes-t_b_4505356.html. ||
+      Porter-Stemmer came from https://github.com/kristopolous/Porter-Stemmer
+    </em></small>
+
+  </section>
+</body>
+<script>
+const K = 4;
+const TOPIC_TERMS = 5;
+const ramp = d3.schemeSet2;
+
+
+runLDA();
+
+function runLDA() {
+  const data = _.take(_.shuffle(QUOTES), 60);
+  const dataCopy = _.clone(data).map( d => normalize(d)).map(d => d.split(' '));
+  const [ phi, theta, vocab ] = LDA.run(dataCopy, K, 200);
+
+  d3.select('#quotes').selectAll('*').remove();
+  d3.select('#topics').selectAll('*').remove();
+  
+  const topics = phi.map( topic => {
+    return topic.map( (term, idx) => {
+      return { 
+        term: vocab[idx],
+        value: term.toFixed(4)
+      }
+    }).sort( (a, b) => {
+      return b.value - a.value;
+    }).splice(0, TOPIC_TERMS);
+  });
+  
+  
+  const sents = theta.map(sent => {
+    return sent.map( d => d.toFixed(2));
+  });
+  
+  const rows = d3.select('#quotes')
+    .selectAll('tr')
+    .data(data)
+    .enter()
+    .append('tr');
+  
+  for (let j=0; j < K; j++) {
+    rows.append('td').text( (d, i) => sents[i][j])
+      .style('color', '#333')
+      .style('background', ramp[j])
+      .style('opacity', (d, i) => +sents[i][j] / 0.7);
+  }
+  rows.append('td').text(d => d);
+  
+  
+  const topicRows = d3.select('#topics')
+    .selectAll('tr')
+    .data(topics)
+    .enter()
+    .append('tr');
+  topicRows.append('td').text( (d, i)=> 'Topic ' + (i+1))
+    .style('font-weight', 600)
+    .style('background', (d, i) => ramp[i]);
+  
+  for (let i=0; i < TOPIC_TERMS; i++) {
+    topicRows.append('td').text(d => d[i].term);
+  }
+}
+
+
+function normalize(str) {
+  let cleaned = str.toLowerCase();;
+  cleaned = cleaned.replace(new RegExp('\\b('+stopwords.join('|')+')\\b', 'g'), '');
+  cleaned = stemmer(cleaned);
+  cleaned = cleaned.replace(/[^\w\s]|_/g, '').replace(/\s+/g, ' ').trim();
+  return cleaned;
+}
+
+</script>
+</html>
+
